@@ -1,0 +1,536 @@
+{
+  "name": "Compound Lipinski Lookup",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "compound-lookup",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        192
+      ],
+      "id": "020dd3be-e207-43e9-9912-b87db84c58d0",
+      "webhookId": "compound-lookup-demo"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst name = (body.compound_name || \"\").trim();\nreturn [{ json: { valid: name.length > 0, compound_name: name } }];"
+      },
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        192
+      ],
+      "id": "648bade2-d847-4de2-9dc3-c84713d0562f"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "IF Input Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        192
+      ],
+      "id": "9a03af40-fa4c-48b9-b61c-14d12a5e0739"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Missing or empty compound_name in request body\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "name": "Respond 400 - Bad Input",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d7aabeb7-db28-405f-b34b-c1d9e7b8a8fb"
+    },
+    {
+      "parameters": {
+        "url": "=https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{{ $json.compound_name }}/cids/JSON",
+        "options": {}
+      },
+      "name": "Get CID from PubChem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        272
+      ],
+      "id": "92ea9ad1-3e75-4a4e-a6fd-be9d3dcc84a3",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\nconst cidList = body && body.IdentifierList && body.IdentifierList.CID;\nconst found = Array.isArray(cidList) && cidList.length > 0;\nreturn [{ json: { cid_found: found, cid: found ? cidList[0] : null, compound_name: $('Validate Input').item.json.compound_name } }];"
+      },
+      "name": "Check CID Found",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        272
+      ],
+      "id": "91a118d9-2aa5-471e-a27b-8fcdc788336e"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.cid_found }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "IF CID Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        448,
+        272
+      ],
+      "id": "a4ab223b-165e-447a-8f83-d680550e95b8"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Compound not found in PubChem\", \"compound_name\": $json.compound_name } }}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "name": "Respond 404 - Not Found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        80
+      ],
+      "id": "1e1b7e9d-6be2-423c-b0ca-7d0ea6e09f0a"
+    },
+    {
+      "parameters": {
+        "url": "=https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{{ $json.cid }}/property/MolecularWeight,XLogP,HBondDonorCount,HBondAcceptorCount,TPSA,CanonicalSMILES/JSON",
+        "options": {}
+      },
+      "name": "Get Properties from PubChem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        352
+      ],
+      "id": "d5eed6db-8dda-4e17-9f21-5f5c391a2690",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\nconst props = body && body.PropertyTable && body.PropertyTable.Properties && body.PropertyTable.Properties[0];\nconst name = $('Check CID Found').item.json.compound_name;\nif (!props) {\n  return [{ json: { properties_found: false, compound_name: name } }];\n}\nreturn [{ json: {\n  properties_found: true,\n  compound_name: name,\n  molecular_weight: props.MolecularWeight,\n  logp: props.XLogP,\n  hbd: props.HBondDonorCount,\n  hba: props.HBondAcceptorCount,\n  tpsa: props.TPSA,\nsmiles: props.ConnectivitySMILES || props.CanonicalSMILES\n} }];"
+      },
+      "name": "Parse Properties",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        352
+      ],
+      "id": "0de387b8-dffe-4bc4-adc8-6a6c3ad92257"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.properties_found }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "IF Properties Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        352
+      ],
+      "id": "1d5bb053-193a-428d-bf83-ce2baa0f30e9"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"PubChem property lookup failed for this compound\", \"compound_name\": $json.compound_name } }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "name": "Respond 502 - Property Lookup Failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1328,
+        160
+      ],
+      "id": "76080e8b-85e0-49ad-95c1-659871cdefaf"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst passes = d.molecular_weight <= 500 && d.logp <= 5 && d.hbd <= 5 && d.hba <= 10;\nreturn [{ json: { ...d, passes_lipinski: passes } }];"
+      },
+      "name": "Apply Lipinski Rule",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        432
+      ],
+      "id": "6cc24c67-b4e0-48d4-a7d5-31920c6f89ec"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.passes_lipinski }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "IF Passes Lipinski?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1552,
+        432
+      ],
+      "id": "d39020f0-80a4-44dd-857e-1f49cd59aed1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Respond 200 - Pass",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1984,
+        352
+      ],
+      "id": "0c297f38-2daa-4ab0-b9ad-535636350604"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "name": "Respond 200 - Fail",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        544
+      ],
+      "id": "4169d278-13a6-41f5-9539-7e0af593a6a5"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Lipinski Hits",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "compound_name": "={{ $json.compound_name }}",
+            "molecular_weight": "={{ $json.molecular_weight }}",
+            "logp": "={{ $json.logp }}",
+            "timestamp": "={{ $now.toISO() }}",
+            "smiles": "={{ $json.smiles }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "compound_name",
+              "displayName": "compound_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "molecular_weight",
+              "displayName": "molecular_weight",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "logp",
+              "displayName": "logp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "smiles",
+              "displayName": "smiles",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1760,
+        352
+      ],
+      "id": "5caa4ef8-fde9-4016-86c1-93da553c50d3",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "IF Input Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Input Valid?": {
+      "main": [
+        [
+          {
+            "node": "Get CID from PubChem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 400 - Bad Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get CID from PubChem": {
+      "main": [
+        [
+          {
+            "node": "Check CID Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check CID Found": {
+      "main": [
+        [
+          {
+            "node": "IF CID Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF CID Found?": {
+      "main": [
+        [
+          {
+            "node": "Get Properties from PubChem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 404 - Not Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Properties from PubChem": {
+      "main": [
+        [
+          {
+            "node": "Parse Properties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Properties": {
+      "main": [
+        [
+          {
+            "node": "IF Properties Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Properties Found?": {
+      "main": [
+        [
+          {
+            "node": "Apply Lipinski Rule",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 502 - Property Lookup Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Lipinski Rule": {
+      "main": [
+        [
+          {
+            "node": "IF Passes Lipinski?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Passes Lipinski?": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 200 - Fail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 - Pass",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "af8538f1-eddf-482a-8756-843976846d09",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "REDACTED"
+  },
+  "id": "TTmiLjD9mz93kwBR",
+  "tags": []
+}
