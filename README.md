@@ -4,7 +4,7 @@
 
 A webhook-triggered n8n workflow: given a compound name, it looks up the
 compound on PubChem, retrieves its physicochemical properties, applies
-Lipinski's Rule of Five, and logs passing compounds to a Google Sheet —
+Lipinski's Rule of Five, and logs passing compounds to a Google Sheet
 with explicit error handling for invalid input, compounds PubChem can't
 resolve, and property-lookup failures.
 
@@ -13,7 +13,7 @@ resolve, and property-lookup failures.
 This workflow was designed collaboratively (with AI assistance) based on
 the logic in my `pubchem-metabolite-descriptor-fetcher` Python repository,
 then imported, configured, debugged, and tested end-to-end by me. It's a
-portfolio demonstration, not an exported real-client workflow — I don't
+portfolio demonstration, not an exported real-client workflow I don't
 currently have a shareable client deliverable available. It is also not
 connected to my published research.
 
