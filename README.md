@@ -13,9 +13,9 @@ resolve, and property-lookup failures.
 This workflow was designed collaboratively (with AI assistance) based on
 the logic in my `pubchem-metabolite-descriptor-fetcher` Python repository,
 then imported, configured, debugged, and tested end-to-end by me. It's a
-portfolio demonstration, not an exported real-client workflow I don't
-currently have a shareable client deliverable available. It is also not
-connected to my published research.
+portfolio demonstration, not an exported real-client workflow — I don't
+currently have a shareable client deliverable available to showcase. It is
+also not connected to my published research.
 
 ### What it does
 
